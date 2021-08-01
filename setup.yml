@@ -1,0 +1,42 @@
+---
+- name: Initial servers setup
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Create wheel group
+    group:
+      name: wheel
+      state: present
+
+  - name: Allow users in wheel group using sudo without password
+    lineinfile:
+      path: /etc/sudoers
+      state: present
+      regexp: "^%wheel"
+      line: "%wheel ALL=(ALL) NOPASSWD: ALL"
+      validate: visudo -cf %s
+
+  - name: Create remote user with sudo privileges
+    user:
+      name: "{{ remote_user }}"
+      state: present
+      groups: wheel
+      shell: /bin/bash
+
+  - name: Set authorized key for remote user
+    authorized_key:
+      user: "{{ remote_user }}"
+      state: present
+      key: "{{ item }}"
+    with_file:
+      - "{{ ssh_public_key_file }}"
+
+  - name: Update and upgrade apt packages
+    apt:
+      update_cache: yes
+      cache_valid_time: "{{ cache_time }}"
+      upgrade: yes
+
+  - name: Reboot servers
+    reboot:
